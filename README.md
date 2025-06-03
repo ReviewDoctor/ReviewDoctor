@@ -13,20 +13,25 @@
 
 ---
 
-## Azure OpenAI 디렉토리 구조
+## 프로젝트트 디렉토리 구조
 
 ReviewDoctor/
-├── data/ # 리뷰 CSV 파일
+├── data/ # 샘플 리뷰 CSV 파일
 │ └── adjectives_with_service_ratings.csv
-├── src/
-│ ├── gpt_client.py # Azure OpenAI 호출
-│ └── report_generator.py # 리뷰 분리 + 프롬프트 생성 + 응답 처리
-├── streamlit_app.py # Streamlit 앱
-├── main.py # CLI 실행용 진입점
-├── .env # (로컬 전용) Azure API 키
-├── .env.example # 공유용 환경 변수 템플릿
-├── requirements.txt # 설치 패키지 목록
+├── pages/ # Streamlit 멀티 페이지 구성
+│ ├── 1_review_upload_and_analysis.py # 더미 분석 + 시각화
+│ └── 2_generate_report.py # GPT 기반 리포트 생성
+├── src/ # GPT 호출 및 리포트 처리 로직
+│ ├── gpt_client.py # Azure OpenAI 연결
+│ └── report_generator.py # 프롬프트 생성 및 결과 반환
+├── streamlit_app.py # 메인 페이지 (CSV 업로드 및 라우팅 안내)
+├── main.py # CLI 기반 GPT 리포트 생성 진입점
+├── .env # 실제 실행용 환경변수 (로컬)
+├── .env.example # 공유용 환경변수 템플릿
+├── requirements.txt # 의존성 패키지 목록
 └── README.md
+
+> `streamlit_app.py`에서 CSV 파일을 업로드하면 세션을 통해 모든 페이지에서 공유됩니다.
 
 ---
 
@@ -49,3 +54,6 @@ AZURE_OPENAI_API_VERSION=2025-01-01-preview
 
 2. Streamlit 앱 실행
 `python -m streamlit run streamlit_app.py`
+
+3. 웹 브라우저에서 자동 실행되는 페이지에서 사용
+- 기본 주소: http://localhost:8501
