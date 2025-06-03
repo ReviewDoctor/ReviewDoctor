@@ -26,7 +26,7 @@ if uploaded_file:
 
                 st.download_button("⬇마케팅 리포트 다운로드", marketing_report, file_name="marketing_report.txt")
 
-                st.subheader("🛠️ 서비스 개선 전략 리포트")
+                st.subheader("서비스 개선 전략 리포트")
                 st.text_area("Service Report", service_report, height=400)
 
                 st.download_button("⬇서비스 리포트 다운로드", service_report, file_name="service_report.txt")
