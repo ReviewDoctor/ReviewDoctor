@@ -9,7 +9,67 @@ import seaborn as sns
 from wordcloud import WordCloud
 
 st.set_page_config(page_title="리뷰 분석", page_icon="📊")
-st.title(":blue[항공사 좌석별 리뷰 데이터 분석]")
+st.title("항공사 좌석별 리뷰 데이터 분석")
+
+# 파란색 버튼 스타일 CSS 추가
+st.markdown("""
+<style>
+.stButton > button {
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    background-color: #1565C0;
+    padding: 10px 15px;
+    font-size: 20px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.stButton > button:hover {
+    background-color: #1565C0;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(30, 136, 229, 0.3);
+}
+
+.stButton > button:active {
+    color: #fff;
+    background-color: #0D47A1;
+    transform: translateY(0px);
+}
+
+.stButton > button:focus {
+    color: #fff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(30, 136, 229, 0.3);
+}
+            
+
+.select_box {
+    background-color: #CAEEFF;
+    display: flex;
+    width: clac(100% + 30px);
+    margin-left: -20px;
+    margin-right: -20px;
+    height: 70px;
+    margin-bottom: -70px;
+    border-radius: 20px;
+}
+            
+.date_box {
+    background-color: #CAEEFF;
+    display: flex;
+    width: clac(100% + 30px);
+    margin-left: -20px;
+    margin-right: -20px;
+    height: 100px;
+    margin-bottom: -100px;
+    border-radius: 20px;
+}
+
+
+# </style>
+""", unsafe_allow_html=True)
 
 # 세션에서 파일 불러오기
 if "uploaded_file" not in st.session_state:
@@ -19,10 +79,6 @@ if "uploaded_file" not in st.session_state:
 uploaded_file = st.session_state["uploaded_file"]
 uploaded_file.seek(0)
 df = pd.read_csv(uploaded_file)
-
-# CSV 업로드 미리보기
-# st.subheader("업로드된 리뷰 데이터 미리보기")
-# st.dataframe(df.head(10))
 
 # 1. 데이터 전처리 함수
 def preprocess_data(df):
@@ -42,8 +98,8 @@ def preprocess_data(df):
     df['year'] = 2025
     df['month'] = df.index.map(lambda x: 5 if x % 2 == 0 else 6)
     
-    # Recommended를 good/bad로 매핑
-    df['sentiment'] = df['Recommended'].map({'yes': 'good', 'no': 'bad'})
+    # Recommended를 추천/비추천으로 매핑
+    df['sentiment'] = df['Recommended'].map({'yes': '추천', 'no': '비추천'})
     
     # 명사(Nouns) 전처리
     df['Nouns'] = df['Nouns'].fillna('').apply(lambda x: [word.strip() for word in str(x).split(',')])
@@ -60,8 +116,8 @@ def build_review_data(df):
         if month not in review_data[year]:
             review_data[year][month] = {}
         
-        good_data = group[group['sentiment'] == 'good']
-        bad_data = group[group['sentiment'] == 'bad']
+        good_data = group[group['sentiment'] == '추천']
+        bad_data = group[group['sentiment'] == '비추천']
         
         # 여행객 유형 분포
         traveller_dist = group['TypeOfTraveller'].value_counts(normalize=True).to_dict()
@@ -84,12 +140,12 @@ def build_strengths_weaknesses(df):
     for seat_class in df['SeatType'].unique():
         # 긍정 리뷰 명사 추출
         good_nouns = []
-        for nouns in df[(df['SeatType'] == seat_class) & (df['sentiment'] == 'good')]['Nouns']:
+        for nouns in df[(df['SeatType'] == seat_class) & (df['sentiment'] == '추천')]['Nouns']:
             good_nouns.extend(nouns)
         
         # 부정 리뷰 명사 추출
         bad_nouns = []
-        for nouns in df[(df['SeatType'] == seat_class) & (df['sentiment'] == 'bad')]['Nouns']:
+        for nouns in df[(df['SeatType'] == seat_class) & (df['sentiment'] == '비추천')]['Nouns']:
             bad_nouns.extend(nouns)
         
         # 상위 5개 명사 추출 (빈도순)
@@ -146,6 +202,10 @@ def build_traveller_data(df):
     
     return traveller_data
 
+# 6. 전체 여행객 유형 분포 계산
+def build_overall_traveller_dist(df):
+    return df['TypeOfTraveller'].value_counts(normalize=True).to_dict()
+
 # 6. 데이터 전처리 및 분석
 try:
     # 데이터 전처리
@@ -156,6 +216,7 @@ try:
     strengths, weaknesses = build_strengths_weaknesses(processed_df)
     rating_data = build_rating_data(processed_df)
     traveller_data = build_traveller_data(processed_df)
+    overall_traveller_dist = build_overall_traveller_dist(processed_df)
     
     # 디버깅 정보 출력
     # st.success("리뷰 분석 완료!")
@@ -166,33 +227,43 @@ except Exception as e:
     st.stop()
 
 # --- UI 및 시각화  -------------------------------------
-# st.title("리뷰 데이터 분석")
-
-# 좌석 종류 선택
-# seat_classes = processed_df['SeatType'].unique().tolist()
-# seat_class = st.radio("**좌석 종류를 골라주세요.**", seat_classes, horizontal=True)
 # 좌석 종류 선택
 seat_classes = processed_df['SeatType'].unique().tolist()
 
 # 좌석 종류를 버튼 스타일로 표시
-st.markdown("**좌석 종류를 골라주세요.**")
+# st.markdown("**좌석 종류를 골라주세요.**")
+
+st.markdown(' <div class="select_box">', unsafe_allow_html=True)
 cols = st.columns(len(seat_classes))
 if 'selected_seat_class' not in st.session_state:
     st.session_state.selected_seat_class = seat_classes[0]
 
+
 for i, seat_type in enumerate(seat_classes):
     with cols[i]:
-        if st.button(
-            seat_type, 
-            key=f"seat_{seat_type}",
-            use_container_width=True,
-            type="secondary" if st.session_state.selected_seat_class == seat_type else "secondary"
-        ):
-            st.session_state.selected_seat_class = seat_type
+        # 선택된 버튼에 특별한 스타일 적용 -> 스타일 무너져서 사용 X
+        # if st.session_state.selected_seat_class == seat_type:
+        #     st.markdown('<span class="selected-button">', unsafe_allow_html=True)
+        #     if st.button(
+        #         seat_type, 
+        #         key=f"seat_{seat_type}",
+        #         use_container_width=True
+        #     ):
+        #         st.session_state.selected_seat_class = seat_type
+        #     st.markdown('</span>', unsafe_allow_html=True)
+        # else:
+            if st.button(
+                seat_type, 
+                key=f"seat_{seat_type}",
+                use_container_width=True
+            ):
+                st.session_state.selected_seat_class = seat_type
 
 seat_class = st.session_state.selected_seat_class
+st.markdown('</div>', unsafe_allow_html=True)
 
 # 연도 및 월 선택
+st.markdown(' <div class="date_box">', unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 with col1:
     available_years = list(review_data.keys())
@@ -204,6 +275,8 @@ with col2:
     else:
         st.warning("선택한 연도에 데이터가 없습니다.")
         st.stop()
+
+st.markdown(' </div>', unsafe_allow_html=True)
 
 # 선택한 데이터 가져오기
 current_review = review_data[selected_year][selected_month].get(seat_class)
@@ -219,8 +292,8 @@ if not current_review or not current_rating or not current_traveller:
 st.markdown(f""" --- """)
 st.markdown(f""" ## :blue[{selected_year}년 {selected_month}월 {seat_class}의 리뷰 요약] """)
 
-# 감성 분포 파이 차트
-st.subheader("감성 분포")
+# 추천 분포 파이 차트
+st.subheader("추천 / 비추천 분석")
 sentiment_labels = list(current_review['sentiment_dist'].keys())
 sentiment_values = list(current_review['sentiment_dist'].values())
 
@@ -228,7 +301,7 @@ fig_sentiment = go.Figure(data=[go.Pie(
     labels=sentiment_labels,
     values=sentiment_values,
     hole=0.3,
-    marker_colors=['lightgreen', 'lightcoral']
+    marker_colors=['lightcoral', 'lightgreen']
 )])
 st.plotly_chart(fig_sentiment)
 
@@ -345,9 +418,9 @@ st.subheader("리뷰 키워드 분석")
 # 시각화 방식 선택 버튼
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
-    show_wordcloud = st.button("워드 클라우드로 보기", type="secondary")
+    show_wordcloud = st.button("워드 클라우드로 보기")
 with col_btn2:
-    show_chart = st.button("그래프로 보기", type="secondary")
+    show_chart = st.button("그래프로 보기")
 
 # 세션 상태 초기화
 if 'visualization_mode' not in st.session_state:
@@ -361,12 +434,12 @@ elif show_chart:
 
 # 긍정/부정 리뷰 데이터 추출
 good_df = processed_df[(processed_df['SeatType'] == seat_class) & 
-                      (processed_df['sentiment'] == 'good') &
+                      (processed_df['sentiment'] == '추천') &
                       (processed_df['year'] == selected_year) &
                       (processed_df['month'] == selected_month)]
 
 bad_df = processed_df[(processed_df['SeatType'] == seat_class) & 
-                     (processed_df['sentiment'] == 'bad') &
+                     (processed_df['sentiment'] == '비추천') &
                      (processed_df['year'] == selected_year) &
                      (processed_df['month'] == selected_month)]
 
@@ -387,7 +460,7 @@ col1, col2 = st.columns(2)
 if st.session_state.visualization_mode == 'wordcloud':
     # 워드클라우드 표시
     with col1:
-        st.markdown("#### :green[좋았어요]")
+        st.markdown("#### :green[추천해요]")
         if good_nouns:
             text = ' '.join(good_nouns)
             # 긍정 리뷰용 green 계열 색상 함수
@@ -408,7 +481,7 @@ if st.session_state.visualization_mode == 'wordcloud':
             st.info("긍정 리뷰 데이터가 없습니다.")
 
     with col2:
-        st.markdown("#### :red[아쉬웠어요]")
+        st.markdown("#### :red[추천하지 않아요]")
         if bad_nouns:
             text = ' '.join(bad_nouns)
             # 부정 리뷰용 red 계열 색상 함수
@@ -431,7 +504,6 @@ if st.session_state.visualization_mode == 'wordcloud':
 else:
     # 막대그래프 표시
     with col1:
-        # st.markdown("#### :green[좋았어요]")
         if good_counter:
             # 상위 10개 키워드
             top_good = good_counter.most_common(10)
@@ -456,7 +528,6 @@ else:
             st.info("긍정 리뷰 데이터가 없습니다.")
 
     with col2:
-        # st.markdown("#### :red[아쉬웠어요]")
         if bad_counter:
             # 상위 10개 키워드
             top_bad = bad_counter.most_common(10)
