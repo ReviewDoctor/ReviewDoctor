@@ -3,8 +3,8 @@ from src.gpt_client import get_report_from_gpt
 
 def load_reviews(file_path: str):
     df = pd.read_csv(file_path)
-    pos_reviews = df[df["Recommended"] == "yes"]["TopAdjectives"].dropna().tolist()
-    neg_reviews = df[df["Recommended"] == "no"]["TopAdjectives"].dropna().tolist()
+    pos_reviews = df[df["Recommended"] == "yes"]["Adjectives/Adverbs"].dropna().tolist()
+    neg_reviews = df[df["Recommended"] == "no"]["Adjectives/Adverbs"].dropna().tolist()
     return pos_reviews, neg_reviews
 
 def build_prompt(reviews: list[str], report_type: str):
