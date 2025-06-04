@@ -4,7 +4,7 @@ from src.report_generator import generate_reports
 import tempfile
 
 st.set_page_config(page_title="리포트 생성", page_icon="📝")
-st.title("GPT 기반 리포트 생성")
+st.title("GPT 기반 마케팅 리포트 생성")
 
 # CSV 파일이 세션에 있는지 확인
 if "uploaded_file" not in st.session_state:
