@@ -293,17 +293,17 @@ st.markdown(f""" --- """)
 st.markdown(f""" ## :blue[{selected_year}년 {selected_month}월 {seat_class}의 리뷰 요약] """)
 
 # 추천 분포 파이 차트
-st.subheader("추천 / 비추천 분석")
-sentiment_labels = list(current_review['sentiment_dist'].keys())
-sentiment_values = list(current_review['sentiment_dist'].values())
+# st.subheader("추천 / 비추천 분석")
+# sentiment_labels = list(current_review['sentiment_dist'].keys())
+# sentiment_values = list(current_review['sentiment_dist'].values())
 
-fig_sentiment = go.Figure(data=[go.Pie(
-    labels=sentiment_labels,
-    values=sentiment_values,
-    hole=0.3,
-    marker_colors=['lightcoral', 'lightgreen']
-)])
-st.plotly_chart(fig_sentiment)
+# fig_sentiment = go.Figure(data=[go.Pie(
+#     labels=sentiment_labels,
+#     values=sentiment_values,
+#     hole=0.3,
+#     marker_colors=['lightcoral', 'lightgreen']
+# )])
+# st.plotly_chart(fig_sentiment)
 
 # 강점/약점 표시
 st.success(f"**우리 항공사의 마케팅 포인트:** {strengths[seat_class]}")
@@ -551,7 +551,247 @@ else:
         else:
             st.info("부정 리뷰 데이터가 없습니다.")
 
-# 6. 리포트 생성 페이지로 이동 버튼
+# 6. 전체 클러스터링 분석 섹션 -----------------------------------
+st.markdown("---")
+# 클러스터링 분석 섹션 표시 상태 초기화
+if 'show_clustering' not in st.session_state:
+    st.session_state.show_clustering = False
+
+# 분석 결과 보러 가기 버튼
+if st.button("분석 결과 보러 가기", key="main_report_button"):
+    st.session_state.show_clustering = True
+
+# 클러스터링 분석 섹션 표시
+if st.session_state.show_clustering:
+    st.subheader("전체 고객 군집 분석 (K-means 클러스터링)")
+    st.markdown("**BERT 기반 텍스트 클러스터링으로 발견된 24개 고객 군집 (2개 추천여부 × 4개 좌석타입 × 3개 클러스터)**")
+
+    # 전체 클러스터 데이터 사용
+    cluster_df = processed_df.copy()
+
+    # 클러스터별 통계 계산 (좌석타입과 추천여부 포함)
+    cluster_stats = []
+    for (seat_type, recommended, cluster_id), group in cluster_df.groupby(['SeatType', 'sentiment', 'ClusterID']):
+        # 기본 통계
+        stats = {
+            'SeatType': seat_type,
+            'Sentiment': recommended,
+            'ClusterID': cluster_id,
+            'UniqueID': f"{seat_type}_{recommended}_{cluster_id}",
+            'Count': len(group),
+            'AvgOverallRating': group['OverallRating'].mean(),
+            'RecommendationRate': (group['sentiment'] == '추천').mean() * 100,
+            'DominantTraveller': group['TypeOfTraveller'].mode().iloc[0] if len(group) > 0 else 'N/A'
+        }
+    
+        # 서비스 항목별 평균 점수
+        service_cols = ['SeatComfort', 'CabinStaffService', 'Food&Beverages', 'GroundService', 'InflightEntertainment']
+        for col in service_cols:
+            stats[col] = group[col].mean()
+    
+        cluster_stats.append(stats)
+
+    cluster_stats_df = pd.DataFrame(cluster_stats)
+
+    # 1) 전체 클러스터 분포 시각화 
+    # st.markdown("#### 📊 전체 클러스터 분포")
+
+    # col1, col2 = st.columns(2)
+
+    # with col1:
+    #     # 좌석 타입별 클러스터 개수 및 고객 수
+    #     seat_summary = cluster_stats_df.groupby('SeatType').agg({
+    #         'Count': 'sum',
+    #         'ClusterID': 'count'
+    #     }).reset_index()
+    #     seat_summary.columns = ['SeatType', 'TotalCustomers', 'ClusterCount']
+    
+    #     fig_seat_dist = go.Figure()
+    #     fig_seat_dist.add_trace(go.Bar(
+    #         x=seat_summary['SeatType'],
+    #         y=seat_summary['TotalCustomers'],
+    #         marker_color=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'],
+    #         text=seat_summary['TotalCustomers'],
+    #         textposition='auto',
+    #         name='총 고객 수'
+    #     ))
+    #     fig_seat_dist.update_layout(
+    #         title="좌석 타입별 총 고객 수",
+    #         xaxis_title="좌석 타입",
+    #         yaxis_title="고객 수",
+    #         height=400
+    #     )
+    #     st.plotly_chart(fig_seat_dist, use_container_width=True)
+
+    # with col2:
+    #     # 추천/비추천 분포
+    #     sentiment_summary = cluster_stats_df.groupby('Sentiment')['Count'].sum().reset_index()
+    
+    #     fig_sentiment_dist = go.Figure(data=[go.Pie(
+    #         labels=sentiment_summary['Sentiment'],
+    #         values=sentiment_summary['Count'],
+    #         hole=0.4,
+    #         marker_colors=['lightcoral', 'lightgreen'],
+    #         textinfo='label+percent+value'
+    #     )])
+    #     fig_sentiment_dist.update_layout(
+    #         title="전체 추천/비추천 분포",
+    #         height=400
+    #     )
+    #     st.plotly_chart(fig_sentiment_dist, use_container_width=True)
+
+    # 2) 클러스터별 평점 분포 히트맵
+    st.markdown("#### 🔥 24개 군집 평점 히트맵")
+
+    # 히트맵을 위한 데이터 준비
+    heatmap_data = cluster_stats_df.pivot_table(
+        index=['SeatType', 'Sentiment'], 
+        columns='ClusterID', 
+        values='AvgOverallRating'
+    ).fillna(0)
+
+    # 인덱스를 문자열로 변환
+    heatmap_labels = [f"{seat}_{sent}" for seat, sent in heatmap_data.index]
+
+    fig_heatmap_all = go.Figure(data=go.Heatmap(
+        z=heatmap_data.values,
+        x=[f"클러스터 {i}" for i in heatmap_data.columns],
+        y=heatmap_labels,
+        colorscale='RdYlGn',
+        text=np.round(heatmap_data.values, 2),
+        texttemplate="%{text}",
+        textfont={"size":10},
+        colorbar=dict(title="평점")
+    ))
+
+    fig_heatmap_all.update_layout(
+        title="24개 군집별 전체 평점 히트맵",
+        height=600,
+        xaxis_title="클러스터 ID",
+        yaxis_title="좌석타입_추천여부"
+    )
+    st.plotly_chart(fig_heatmap_all, use_container_width=True)
+
+    # 3) 서비스 항목별 클러스터 성과 분석
+    st.markdown("#### 🎯 서비스 항목별 클러스터 성과")
+
+    service_cols = ['SeatComfort', 'CabinStaffService', 'Food&Beverages', 'GroundService', 'InflightEntertainment']
+    service_labels = ['좌석 편안함', '승무원 서비스', '식음료', '지상 서비스', '기내 엔터테인먼트']
+
+    # 각 서비스 항목별 최고/최저 클러스터 찾기
+    service_analysis = {}
+    for i, col in enumerate(service_cols):
+        best_idx = cluster_stats_df[col].idxmax()
+        worst_idx = cluster_stats_df[col].idxmin()
+    
+        service_analysis[service_labels[i]] = {
+            'best': {
+                'cluster': cluster_stats_df.loc[best_idx, 'UniqueID'],
+                'score': cluster_stats_df.loc[best_idx, col],
+                'seat_type': cluster_stats_df.loc[best_idx, 'SeatType'],
+                'sentiment': cluster_stats_df.loc[best_idx, 'Sentiment']
+            },
+            'worst': {
+                'cluster': cluster_stats_df.loc[worst_idx, 'UniqueID'],
+                'score': cluster_stats_df.loc[worst_idx, col],
+                'seat_type': cluster_stats_df.loc[worst_idx, 'SeatType'],
+                'sentiment': cluster_stats_df.loc[worst_idx, 'Sentiment']
+            }
+        }
+
+    # 서비스별 최고/최저 성과 표시
+    for service, data in service_analysis.items():
+        col1, col2 = st.columns(2)
+        with col1:
+            st.success(f"""
+            **🏆 {service} 최고 성과**
+            - 클러스터: {data['best']['cluster']}
+            - 점수: {data['best']['score']:.2f}
+            - 좌석: {data['best']['seat_type']} ({data['best']['sentiment']})
+            """)
+        with col2:
+            st.error(f"""
+            **⚠️ {service} 개선 필요**
+            - 클러스터: {data['worst']['cluster']}
+            - 점수: {data['worst']['score']:.2f}
+            - 좌석: {data['worst']['seat_type']} ({data['worst']['sentiment']})
+            """)
+
+    # 4) 상위/하위 성과 클러스터 TOP 5
+    st.markdown("#### 🏅 전체 성과 순위")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**⭐ TOP 5 우수 클러스터**")
+        top_clusters = cluster_stats_df.nlargest(5, 'AvgOverallRating')[
+            ['UniqueID', 'SeatType', 'Sentiment', 'AvgOverallRating', 'Count', 'DominantTraveller']
+        ]
+        for idx, row in top_clusters.iterrows():
+            st.success(f"""
+            **{row['UniqueID']}**
+            - 평점: {row['AvgOverallRating']:.2f} | 고객수: {row['Count']}명
+            - 주요 여행객: {row['DominantTraveller']}
+            """)
+
+    with col2:
+        st.markdown("**⚠️ 개선 필요 클러스터 TOP 5**")
+        bottom_clusters = cluster_stats_df.nsmallest(5, 'AvgOverallRating')[
+            ['UniqueID', 'SeatType', 'Sentiment', 'AvgOverallRating', 'Count', 'DominantTraveller']
+        ]
+        for idx, row in bottom_clusters.iterrows():
+            st.error(f"""
+            **{row['UniqueID']}**
+            - 평점: {row['AvgOverallRating']:.2f} | 고객수: {row['Count']}명
+            - 주요 여행객: {row['DominantTraveller']}
+            """)
+
+    # 5) 클러스터 세부 정보 (선택적 확장)
+    st.markdown("#### 🔍 클러스터 세부 분석")
+
+    # 좌석 타입별로 그룹화하여 표시
+    for seat_type in cluster_stats_df['SeatType'].unique():
+        seat_clusters = cluster_stats_df[cluster_stats_df['SeatType'] == seat_type]
+    
+        with st.expander(f"📋 {seat_type} 클러스터 상세 정보"):
+            for _, row in seat_clusters.iterrows():
+                cluster_data = cluster_df[
+                    (cluster_df['SeatType'] == row['SeatType']) & 
+                    (cluster_df['sentiment'] == row['Sentiment']) & 
+                    (cluster_df['ClusterID'] == row['ClusterID'])
+                ]
+            
+                status_emoji = "✅" if row['Sentiment'] == '추천' else "❌"
+            
+                st.markdown(f"**{status_emoji} 클러스터 {row['ClusterID']} ({row['Sentiment']})**")
+            
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("고객 수", f"{row['Count']}명")
+                    st.metric("전체 평점", f"{row['AvgOverallRating']:.2f}")
+                with col2:
+                    st.metric("좌석 편안함", f"{row['SeatComfort']:.2f}")
+                    st.metric("승무원 서비스", f"{row['CabinStaffService']:.2f}")
+                with col3:
+                    st.metric("식음료", f"{row['Food&Beverages']:.2f}")
+                    st.metric("지상 서비스", f"{row['GroundService']:.2f}")
+                with col4:
+                    st.metric("기내 엔터테인먼트", f"{row['InflightEntertainment']:.2f}")
+                    st.metric("주요 여행객", row['DominantTraveller'])
+
+                # 대표 키워드 표시
+                if len(cluster_data) > 0:
+                    cluster_nouns = []
+                    for nouns in cluster_data['Nouns']:
+                        cluster_nouns.extend(nouns)
+                
+                    if cluster_nouns:
+                        top_keywords = [word for word, _ in Counter(cluster_nouns).most_common(8)]
+                        st.markdown(f"**🔑 대표 키워드:** {', '.join(top_keywords)}")
+            
+                st.markdown("---")
+
+# 7. 리포트 생성 페이지로 이동 버튼
 st.markdown("---")
 if st.button("리포트 생성하러 가기"):
     st.switch_page("pages/2_generate_report.py")
